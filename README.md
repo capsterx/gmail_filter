@@ -15,7 +15,20 @@ var DEBUG_FILTER=null;
 
 function process_unprocessed()
 {
-  var filters = [...];
+  var filters = [
+    {id: 'from_root', name: 'system/root', from: /root@/, archive: true},
+    //NOTE: a cron will get root label also as they both will match
+    {id: 'from_cron', name: 'system/cron', from: /^Cron Daemon <root@/, archive: true},
+
+    // Get label from regex
+    {id: 'code', prefix_name: 'code/', filters: [['to', /commits@foo\.com/], ['subject', /^\[([^:\/\]]+).*\]/]], archive: true},
+
+    //Make sure filter 'tickets' wont also label my tickets.
+    [
+      {id: 'my tickets', name: 'tickets/mine', filters: [['from', /tickets@foo\.com/], ['body', /jbrannan|Jonathan/]]},
+      {id: 'tickets', name: 'tickets/not_mine', filters: [['from', /tickets@foo\.com/]], archive: true}
+    ]
+  ];
 
   var post_process = {
     archive: {archive: true, removeLabel: "unprocessed"},
@@ -24,30 +37,34 @@ function process_unprocessed()
   var selection = '-in:inbox label:unprocessed';
   labeler(filters, post_process, selection);
 }
-```
-
+``` 
 each element of 'filters' is a hash containing:
-id: string.  Used for debugging a filter and logging
-name: string.  The label the filter will get.  If it does not exist, it will be auto created.  sub-labels path seperated.  Ex: "foo/bar"
-prefix_name: string.  Instead of applying a filter "name" use this and add the first group match of a regex filter
-archive: bool.  Move to archive
-markRead: bool.  Mark as read
-star: bool Star email.
-to, from, cc, body, subject:  regex.  Filter on this.  If using more than one, and the operations together.  If you need more advanced filtering, use 'filters'
-filters: array.  each element of the array is an array of 2 elements.  first element is to/from/cc/body/subject.  Second element is a regex.  Conditions are applied in-order.  If the first letter of name is a !, it will negate the result.
+
+* id: string.  Used for debugging a filter and logging
+* name: string.  The label the filter will get.  If it does not exist, it will be auto created.  sub-labels path seperated.  Ex: "foo/bar"
+* prefix_name: string.  Instead of applying a filter "name" use this and add the first group match of a regex filter
+* archive: bool.  Move to archive
+* markRead: bool.  Mark as read
+* star: bool Star email.
+* to, from, cc, body, subject:  regex.  Filter on this.  If using more than one, and the operations together.  If you need more advanced filtering, use 'filters'
+* filters: array.  each element of the array is an array of 2 elements.  first element is to/from/cc/body/subject.  Second element is a regex.  Conditions are applied in-order.  If the first letter of name is a !, it will negate the result.
+
+If instead of a hash, the element is an array, then it's an array of filter hashs.  The filters in the array will be tested in-order, and any match will short-circuit the processing.
 
 post_process has 'archive' and 'not_archive' which is a set done after all the messages in a thread have been processed.  Here you can:
-addLabel: string label, array of labels, or function returning array of labels
-removeLabel: same as add
-archive: bool: move to archive
-inbox: bool, move to inbox
+* addLabel: string label, array of labels, or function returning array of labels
+* removeLabel: same as add
+* archive: bool: move to archive
+* inbox: bool, move to inbox
 
-DEBUG enables logging
-DEBUG_FILTER, only process one filter with this id
+A few global variables you can set
 
-BATCH_SIZE: amount of emails in every search to apply.  I stick with 200.
+* DEBUG enables logging
+* DEBUG_FILTER, only process one filter with this id
+* BATCH_SIZE: amount of emails in every search to apply.  I stick with 200.
 
 Once this is setup you will want to goto edit/current projects triggers
+
 Add a new trigger for your function, time based, minutes counter, every minute
 
 NOTE: with a batch of 200 and processing every minute, i find gmail will let me process less than 10k a day before I hit the limit.  Any heavy-hitter filters should be done with gmail filtering.  
